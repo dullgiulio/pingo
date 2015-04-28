@@ -393,10 +393,11 @@ func (p *Plugin) run() {
 	params := make([]string, len(p.params)+2)
 	params[0] = "-pingo:prefix=" + string(p.meta)
 	params[1] = "-pingo:proto=" + p.proto
+	offset := 2
 	if p.proto == "unix" && p.unixdir != "" {
 		params = append(params, "-pingo:unixdir="+p.unixdir)
+		offset += 1
 	}
-	offset := len(params)
 	for i := 0; i < len(p.params); i++ {
 		params[i+offset] = p.params[i]
 	}
