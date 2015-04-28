@@ -1,10 +1,12 @@
 package pingo
 
 import (
+	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"net"
-	"net/http"
 	"net/rpc"
 	"os"
 	"path"
@@ -63,15 +65,17 @@ func makeConfig() *config {
 }
 
 type rpcServer struct {
-	server  *rpc.Server
+	*rpc.Server
+	secret  string
 	objs    []string
 	conf    *config
 	running bool
 }
 
-func newRpcServer() *rpcServer {
+func newRpcServer(secret string) *rpcServer {
 	r := &rpcServer{
-		server: rpc.DefaultServer,
+		Server: rpc.NewServer(),
+		secret: secret,
 		objs:   make([]string, 0),
 		conf:   makeConfig(), // conf remains fixed after this point
 	}
@@ -79,12 +83,98 @@ func newRpcServer() *rpcServer {
 	return r
 }
 
-var defaultServer = newRpcServer()
+var defaultServer = newRpcServer(randstr(64))
+
+type bufReadWriteCloser struct {
+	*bufio.Reader
+	r io.ReadWriteCloser
+}
+
+func newBufReadWriteCloser(r io.ReadWriteCloser) *bufReadWriteCloser {
+	return &bufReadWriteCloser{Reader: bufio.NewReader(r), r: r}
+}
+
+func (b *bufReadWriteCloser) Write(data []byte) (int, error) {
+	return b.r.Write(data)
+}
+
+func (b *bufReadWriteCloser) Close() error {
+	return b.r.Close()
+}
+
+func readHeaders(brwc *bufReadWriteCloser) ([]byte, error) {
+	var buf bytes.Buffer
+	var headerEnd bool
+
+	for {
+		b, err := brwc.ReadByte()
+		if err != nil {
+			return []byte(""), err
+		}
+
+		buf.WriteByte(b)
+
+		if b == '\n' {
+			if headerEnd {
+				break
+			}
+			headerEnd = true
+		} else {
+			headerEnd = false
+		}
+	}
+
+	return buf.Bytes(), nil
+}
+
+func parseHeaders(brwc *bufReadWriteCloser, m map[string]string) error {
+	headers, err := readHeaders(brwc)
+	if err != nil {
+		return err
+	}
+
+	r := bytes.NewReader(headers)
+	scanner := bufio.NewScanner(r)
+
+	for scanner.Scan() {
+		parts := strings.SplitN(scanner.Text(), ": ", 2)
+		if parts[0] == "" {
+			continue
+		}
+		m[parts[0]] = parts[1]
+	}
+
+	return nil
+}
+
+func (r *rpcServer) authConn(token string) bool {
+	if token != "" && token == r.secret {
+		return true
+	}
+	return false
+}
+
+func (r *rpcServer) serveConn(conn io.ReadWriteCloser, h meta) {
+	bconn := newBufReadWriteCloser(conn)
+	defer bconn.Close()
+
+	headers := make(map[string]string)
+	if err := parseHeaders(bconn, headers); err != nil {
+		h.output("error", err.Error())
+		return
+	}
+
+	if r.authConn(headers["Auth-Token"]) {
+		r.Server.ServeConn(bconn)
+	}
+
+	return
+}
 
 func (r *rpcServer) register(obj interface{}) {
 	element := reflect.TypeOf(obj).Elem()
 	r.objs = append(r.objs, element.Name())
-	r.server.Register(obj)
+	r.Server.Register(obj)
 }
 
 type connection interface {
@@ -142,7 +232,6 @@ func (r *rpcServer) run() error {
 
 	for i := 0; i < conn.retries(); i++ {
 		r.conf.addr = conn.addr()
-		r.server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
 		listener, err = net.Listen(r.conf.proto, r.conf.addr)
 		if err == nil {
 			break
@@ -154,10 +243,15 @@ func (r *rpcServer) run() error {
 		return err
 	}
 
+	h.output("auth-token", defaultServer.secret)
 	h.output("ready", fmt.Sprintf("proto=%s addr=%s", r.conf.proto, r.conf.addr))
-	if err := http.Serve(listener, nil); err != nil {
-		h.output("fatal", fmt.Sprintf("err-http-serve: %s", err.Error()))
-		return err
+	for {
+		var conn net.Conn
+		conn, err = listener.Accept()
+		if err != nil {
+			h.output("fatal", fmt.Sprintf("err-http-serve: %s", err.Error()))
+			continue
+		}
+		go r.serveConn(conn, h)
 	}
-	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/rpc"
 	"os"
 	"os/exec"
@@ -222,6 +223,32 @@ func (wr *waiter) reset() {
 	wr.c = make(chan struct{})
 }
 
+type client struct {
+	*rpc.Client
+	secret string
+}
+
+func newClient(s string, conn io.ReadWriteCloser) *client {
+	return &client{secret: s, Client: rpc.NewClient(conn)}
+}
+
+func (c *client) authenticate(w io.Writer) error {
+	_, err := io.WriteString(w, "Auth-Token: "+c.secret+"\n\n")
+	return err
+}
+
+func dialAuthRpc(secret, network, address string, timeout time.Duration) (*rpc.Client, error) {
+	conn, err := net.DialTimeout(network, address, timeout)
+	if err != nil {
+		return nil, err
+	}
+	c := newClient(secret, conn)
+	if err := c.authenticate(conn); err != nil {
+		return nil, err
+	}
+	return c.Client, nil
+}
+
 type objects struct {
 	list []string
 	err  error
@@ -233,6 +260,8 @@ type ctrl struct {
 	objs []string
 	// Protocol and address for RPC
 	proto, addr string
+	// Secret needed to connect to server
+	secret string
 	// Unrecoverable error is used as response to calls after it happened.
 	err error
 	// This channel is an alias to p.connCh. It allows to
@@ -291,7 +320,7 @@ func (c *ctrl) ready(val string) bool {
 		return false
 	}
 
-	c.client, err = rpc.DialHTTP(c.proto, c.addr)
+	c.client, err = dialAuthRpc(c.secret, c.proto, c.addr, c.p.initTimeout)
 	if err != nil {
 		c.fatal(err)
 		return false
@@ -400,29 +429,21 @@ func (c *ctrl) objects() []string {
 }
 
 func (p *Plugin) run() {
-	var unixdir string
-
 	if p.unixdir == "" {
 		p.unixdir = os.TempDir()
 	}
 
-	paramsize := len(p.params) + 2
-	if p.proto == "unix" && p.unixdir != "" {
-		unixdir = "-pingo:unixdir=" + p.unixdir
-		paramsize += 1
+	params := []string{
+		"-pingo:prefix=" + string(p.meta),
+		"-pingo:proto=" + p.proto,
 	}
-	offset := 2
-	params := make([]string, paramsize)
-	params[0] = "-pingo:prefix=" + string(p.meta)
-	params[1] = "-pingo:proto=" + p.proto
-	if unixdir != "" {
-		params[2] = unixdir
-		offset += 1
+	if p.proto == "unix" && p.unixdir != "" {
+		params = append(params, "-pingo:unixdir="+p.unixdir)
+	}
+	for i := 0; i < len(p.params); i++ {
+		params = append(params, p.params[i])
 	}
 
-	for i := 0; i < len(p.params); i++ {
-		params[i+offset] = p.params[i]
-	}
 	c := newCtrl(p, p.initTimeout)
 
 	pidCh := make(chan int)
@@ -460,6 +481,8 @@ func (p *Plugin) run() {
 		case line := <-c.linesCh:
 			key, val := p.meta.parse(line)
 			switch key {
+			case "auth-token":
+				c.secret = val
 			case "fatal":
 				if err := parseError(val); err != nil {
 					c.fatal(err)
@@ -503,6 +526,10 @@ func (p *Plugin) run() {
 				}(pid, p.exitTimeout)
 
 				c.client.Call(internalObject+".Exit", 0, nil)
+			}
+
+			if c.client != nil {
+				c.client.Close()
 			}
 
 			// Do not accept calls
