@@ -390,14 +390,21 @@ func (c *ctrl) objects() []string {
 }
 
 func (p *Plugin) run() {
-	params := make([]string, len(p.params)+2)
+	var unixdir string
+	paramsize := len(p.params) + 2
+	if p.proto == "unix" && p.unixdir != "" {
+		unixdir = "-pingo:unixdir=" + p.unixdir
+		paramsize += 1
+	}
+	offset := 2
+	params := make([]string, paramsize)
 	params[0] = "-pingo:prefix=" + string(p.meta)
 	params[1] = "-pingo:proto=" + p.proto
-	offset := 2
-	if p.proto == "unix" && p.unixdir != "" {
-		params[2] = "-pingo:unixdir=" + p.unixdir
+	if unixdir != "" {
+		params[2] = unixdir
 		offset += 1
 	}
+
 	for i := 0; i < len(p.params); i++ {
 		params[i+offset] = p.params[i]
 	}
