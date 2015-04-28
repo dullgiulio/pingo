@@ -395,7 +395,7 @@ func (p *Plugin) run() {
 	params[1] = "-pingo:proto=" + p.proto
 	offset := 2
 	if p.proto == "unix" && p.unixdir != "" {
-		params = append(params, "-pingo:unixdir="+p.unixdir)
+		params[2] = "-pingo:unixdir=" + p.unixdir
 		offset += 1
 	}
 	for i := 0; i < len(p.params); i++ {
