@@ -11,8 +11,8 @@ not supported.  Remote plugins might be implemented if requested.
 
 ## Example
 
-Create a new plugin. Make a directory named after the plugin (for example "plugins/hello-world")
-and write "main.go" as follows:
+Create a new plugin. Make a directory named after the plugin (for example ```plugins/hello-world```)
+and write ```main.go``` as follows:
 
 ```go
 // Always create a new binary
@@ -45,7 +45,7 @@ $ cd plugins/hello-world
 $ go build
 ```
 
-You should get an executable called "hello-world". Congratulations, this is your plugin.
+You should get an executable called ```hello-world```. Congratulations, this is your plugin.
 
 Now, time to use the newly create plugin.
 
@@ -81,9 +81,31 @@ func main() {
 Now, build your executable and all should work!  Remember to use the correct path to
 your plugins when you make the Plugin object.  Ideally, always pass an absolute path.
 
+## Unix or TCP?
+
+When allocating a new plugin (via ```NewPlugin```), you have to choose whether to
+use Unix or TCP.
+
+In general, prefer Unix: it has way less overhead. However, if you choose Unix you
+should provide a writable directory where to place the temporary socket.  Do so using
+```SetSocketDirectory``` before you call ```Start```.
+
+If you do not specify a directory, the default temporary directory for your OS will
+be used. Note, however, that for security reasons, it might not be possible to
+create a socket there. It is advised to always specify a local directory.
+
+Otherwise, the overhead of using TCP locally is negligible.
+
+Your Pingo plugin will not accept non-local connections even via TCP.
+
 ## Bugs
 
 Report bugs in Github.  Pull requests are welcome!
+
+## TODO
+
+* Automatically restart crashed plugins
+* Automatically switch between ```unix``` and ```TCP``` if setup of one fails
 
 ## License
 
