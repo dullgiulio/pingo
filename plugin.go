@@ -391,6 +391,11 @@ func (c *ctrl) objects() []string {
 
 func (p *Plugin) run() {
 	var unixdir string
+
+	if p.unixdir == "" {
+		p.unixdir = os.TempDir()
+	}
+
 	paramsize := len(p.params) + 2
 	if p.proto == "unix" && p.unixdir != "" {
 		unixdir = "-pingo:unixdir=" + p.unixdir
