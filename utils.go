@@ -17,6 +17,10 @@ func (h meta) parse(line string) (key, val string) {
 		return
 	}
 
+	if len(line) < len(string(h)) {
+		return
+	}
+
 	if line[0:len(string(h))] != string(h) {
 		return
 	}
