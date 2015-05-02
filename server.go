@@ -27,6 +27,9 @@ func Register(obj interface{}) {
 
 // Run will start all the necessary steps to make the plugin available.
 func Run() error {
+	if !flag.Parsed() {
+		flag.Parse()
+	}
 	return defaultServer.run()
 }
 
@@ -56,7 +59,6 @@ func makeConfig() *config {
 	flag.StringVar(&c.proto, "pingo:proto", "unix", "Protocol to use: unix or tcp")
 	flag.StringVar(&c.unixdir, "pingo:unixdir", "", "Alternative directory for unix socket")
 	flag.StringVar(&c.prefix, "pingo:prefix", "pingo", "Prefix to output lines")
-	flag.Parse()
 	return c
 }
 
