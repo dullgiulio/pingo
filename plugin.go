@@ -329,6 +329,12 @@ func (c *ctrl) wait(pidCh chan<- int, exe string, params ...string) {
 		c.waitCh <- err
 		return
 	}
+	stderr, err := cmd.StdoutPipe()
+	if err != nil {
+		close(pidCh)
+		c.waitCh <- err
+		return
+	}
 	if err := cmd.Start(); err != nil {
 		close(pidCh)
 		c.waitCh <- err
@@ -338,6 +344,7 @@ func (c *ctrl) wait(pidCh chan<- int, exe string, params ...string) {
 	close(pidCh)
 
 	c.readOutput(stdout)
+	c.readOutput(stderr)
 
 	c.waitCh <- cmd.Wait()
 }
