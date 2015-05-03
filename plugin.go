@@ -318,6 +318,11 @@ func (c *ctrl) readOutput(r io.Reader) {
 	}
 }
 
+func (c *ctrl) waitErr(pidCh chan<- int, err error) {
+	close(pidCh)
+	c.waitCh <- err
+}
+
 func (c *ctrl) wait(pidCh chan<- int, exe string, params ...string) {
 	defer close(c.waitCh)
 
@@ -325,21 +330,19 @@ func (c *ctrl) wait(pidCh chan<- int, exe string, params ...string) {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		close(pidCh)
-		c.waitCh <- err
+		c.waitErr(pidCh, err)
 		return
 	}
 	stderr, err := cmd.StdoutPipe()
 	if err != nil {
-		close(pidCh)
-		c.waitCh <- err
+		c.waitErr(pidCh, err)
 		return
 	}
 	if err := cmd.Start(); err != nil {
-		close(pidCh)
-		c.waitCh <- err
+		c.waitErr(pidCh, err)
 		return
 	}
+
 	pidCh <- cmd.Process.Pid
 	close(pidCh)
 
