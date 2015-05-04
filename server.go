@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/rpc"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // Register a new object this plugin exports. The object must be
@@ -72,10 +74,11 @@ type rpcServer struct {
 	running bool
 }
 
-func newRpcServer(secret string) *rpcServer {
+func newRpcServer() *rpcServer {
+	rand.Seed(time.Now().UTC().UnixNano())
 	r := &rpcServer{
 		Server: rpc.NewServer(),
-		secret: secret,
+		secret: randstr(64),
 		objs:   make([]string, 0),
 		conf:   makeConfig(), // conf remains fixed after this point
 	}
@@ -83,7 +86,7 @@ func newRpcServer(secret string) *rpcServer {
 	return r
 }
 
-var defaultServer = newRpcServer(randstr(64))
+var defaultServer = newRpcServer()
 
 type bufReadWriteCloser struct {
 	*bufio.Reader
