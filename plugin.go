@@ -333,7 +333,7 @@ func (c *ctrl) wait(pidCh chan<- int, exe string, params ...string) {
 		c.waitErr(pidCh, err)
 		return
 	}
-	stderr, err := cmd.StdoutPipe()
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		c.waitErr(pidCh, err)
 		return
