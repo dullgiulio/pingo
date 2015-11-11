@@ -1,3 +1,7 @@
+// Copyright 2015 Giulio Iotti. All rights reserved.
+// Use of this source code is governed by a MIT-style
+// license that can be found in the LICENSE file.
+
 // Package pingo implements the basics for creating and running subprocesses
 // as plugins.  The subprocesses will communicate via either TCP or Unix socket
 // to implement an interface that mimics the standard RPC package.
