@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/dullgiulio/pingo"
 )
 
@@ -15,6 +16,6 @@ func (p *Plugin) SayHello(name string, msg *string) error {
 func main() {
 	plugin := &Plugin{}
 
-	pingo.Register(plugin)
+	pingo.Register(plugin, 10881)
 	pingo.Run()
 }
