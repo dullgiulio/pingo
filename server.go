@@ -234,7 +234,7 @@ func (r *rpcServer) run() error {
 
 	switch r.conf.proto {
 	case "tcp":
-		conn = new(r.fromport)
+		conn = new(tcp(r.fromport))
 	default:
 		r.conf.proto = "unix"
 		conn = new(unix)
