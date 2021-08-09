@@ -197,7 +197,7 @@ type tcp int
 func (t *tcp) addr() string {
 	if *t < tcp(defaultServer.fromport) {
 		// Only use unprivileged ports
-		*t = tcp(defaultServer.fromport)
+		*t = tcp(defaultServer.fromport) - 1
 	}
 
 	*t = *t + 1
