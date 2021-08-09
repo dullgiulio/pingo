@@ -26,10 +26,11 @@ import (
 // "rpc" module has to obey.
 //
 // Register will panic if called after Run.
-func Register(obj interface{}) {
+func Register(obj interface{}, fromport int) {
 	if defaultServer.running {
 		panic("Do not call Register after Run")
 	}
+	defaultServer.fromport = fromport
 	defaultServer.register(obj)
 }
 
@@ -72,19 +73,21 @@ func makeConfig() *config {
 
 type rpcServer struct {
 	*rpc.Server
-	secret  string
-	objs    []string
-	conf    *config
-	running bool
+	secret   string
+	objs     []string
+	conf     *config
+	running  bool
+	fromport int
 }
 
 func newRpcServer() *rpcServer {
 	rand.Seed(time.Now().UTC().UnixNano())
 	r := &rpcServer{
-		Server: rpc.NewServer(),
-		secret: randstr(64),
-		objs:   make([]string, 0),
-		conf:   makeConfig(), // conf remains fixed after this point
+		Server:   rpc.NewServer(),
+		secret:   randstr(64),
+		objs:     make([]string, 0),
+		conf:     makeConfig(), // conf remains fixed after this point
+		fromport: 18881,
 	}
 	r.register(&PingoRpc{})
 	return r
@@ -192,9 +195,9 @@ type connection interface {
 type tcp int
 
 func (t *tcp) addr() string {
-	if *t < 1024 {
+	if *t < tcp(defaultServer.fromport) {
 		// Only use unprivileged ports
-		*t = 1023
+		*t = tcp(defaultServer.fromport) - 1
 	}
 
 	*t = *t + 1
