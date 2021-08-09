@@ -195,9 +195,9 @@ type connection interface {
 type tcp int
 
 func (t *tcp) addr() string {
-	if *t < 1024 {
+	if *t < tcp(defaultServer.fromport) {
 		// Only use unprivileged ports
-		*t = 1023
+		*t = tcp(defaultServer.fromport)
 	}
 
 	*t = *t + 1
@@ -234,7 +234,7 @@ func (r *rpcServer) run() error {
 
 	switch r.conf.proto {
 	case "tcp":
-		conn = new(tcp(r.fromport))
+		conn = new(tcp)
 	default:
 		r.conf.proto = "unix"
 		conn = new(unix)
